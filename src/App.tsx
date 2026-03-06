@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Maximize, 
-  Minimize, 
   CheckCircle2, 
   Cpu, 
   Shield, 
@@ -16,7 +12,8 @@ import {
   Lock,
   Activity,
   Globe,
-  LayoutGrid
+  LayoutGrid,
+  Maximize2
 } from 'lucide-react';
 import { SLIDES } from './constants';
 
@@ -36,23 +33,34 @@ export default function App() {
     setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
   }, []);
 
-  const toggleFullscreen = () => {
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    syncFullscreen();
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  const enterFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
+      void document.documentElement.requestFullscreen();
     }
-  };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+      if (e.key === 'ArrowRight') nextSlide();
       if (e.key === 'ArrowLeft') prevSlide();
-      if (e.key === 'f') toggleFullscreen();
+      if (e.key.toLowerCase() === 'z') {
+        if (!document.fullscreenElement) {
+          void document.documentElement.requestFullscreen();
+        } else {
+          void document.exitFullscreen();
+        }
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        nextSlide();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -68,16 +76,27 @@ export default function App() {
   };
 
   return (
-    <div className="relative h-screen w-screen flex flex-col bg-emerald-950 select-none overflow-hidden">
+    <div className="relative min-h-screen w-screen flex flex-col bg-emerald-950 select-none overflow-x-hidden overflow-y-auto hide-scrollbar">
+      {!isFullscreen && (
+        <button
+          onClick={enterFullscreen}
+          className="absolute top-5 right-5 z-30 p-3 rounded-xl bg-emerald-900/50 border border-emerald-700/60 text-emerald-200 hover:bg-emerald-800/70 transition-all"
+          aria-label="Enter fullscreen"
+          title="Full Zoom"
+        >
+          <Maximize2 size={20} />
+        </button>
+      )}
+
       {/* Immersive Background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-800/20 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-amber-900/10 rounded-full blur-[150px]" />
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")' }} />
+        <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.18)_1px,transparent_0)] [background-size:24px_24px]" />
       </div>
 
       {/* Main Content Area (No Card) */}
-      <main className="relative z-10 flex-1 flex flex-col px-8 py-12 md:px-20 md:py-16 max-w-7xl mx-auto w-full">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col px-10 py-14 md:px-24 md:py-20 max-w-7xl mx-auto w-full">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
@@ -85,7 +104,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col"
+            className="flex-1 min-h-0 flex flex-col"
           >
             {/* Header Section */}
             <div className={`mb-12 ${currentSlide === 0 ? 'flex-1 flex flex-col items-center justify-center text-center' : ''}`}>
@@ -94,11 +113,11 @@ export default function App() {
                 animate={{ width: currentSlide === 0 ? 120 : 80 }}
                 className="h-1 bg-amber-400 mb-8 rounded-full shadow-[0_0_20px_rgba(251,191,36,0.6)]" 
               />
-              <h1 className={`${currentSlide === 0 ? 'text-5xl md:text-8xl' : 'text-4xl md:text-7xl'} font-display font-bold text-stone-50 tracking-tight leading-[1.1]`}>
+              <h1 className={`${currentSlide === 0 ? 'text-6xl md:text-9xl' : 'text-5xl md:text-8xl'} font-display font-bold text-stone-50 tracking-tight leading-[1.1]`}>
                 {slide.title}
               </h1>
               {slide.subtitle && (
-                <div className={`mt-8 ${currentSlide === 0 ? 'text-2xl md:text-4xl text-amber-200/90' : 'text-xl md:text-3xl text-emerald-300/80'} font-light italic font-display whitespace-pre-line max-w-4xl`}>
+                <div className={`mt-8 ${currentSlide === 0 ? 'text-3xl md:text-5xl text-amber-200/90' : 'text-2xl md:text-4xl text-emerald-300/80'} font-light italic font-display whitespace-pre-line max-w-4xl`}>
                   {slide.subtitle}
                 </div>
               )}
@@ -111,16 +130,17 @@ export default function App() {
                 >
                   <div className="flex items-center gap-4 text-emerald-400 mb-4 justify-center">
                     <Smartphone size={32} />
-                    <div className="h-px w-12 bg-emerald-800" />
+                    <span className="text-4xl md:text-6xl text-white font-extrabold tracking-wider leading-none drop-shadow-[0_0_18px_rgba(255,255,255,0.35)]">
+                      Selam mdm
+                    </span>
                     <Shield size={32} />
                   </div>
-                  <p className="text-emerald-500 font-mono text-sm tracking-[0.3em] uppercase">Projet de Fin de Semestre</p>
                 </motion.div>
               )}
             </div>
 
             {/* Content Grid */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-4 hide-scrollbar">
               {slide.bullets && (
                 <div className={`grid gap-6 ${getGridClass(currentSlide)}`}>
                   {slide.bullets.map((bullet, idx) => {
@@ -131,12 +151,12 @@ export default function App() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.2 + idx * 0.05 }}
-                        className="group p-6 rounded-3xl bg-emerald-900/30 backdrop-blur-md border border-emerald-800/50 hover:bg-emerald-800/40 hover:border-amber-400/30 transition-all duration-500"
+                        className="group p-8 rounded-3xl bg-emerald-900/30 backdrop-blur-md border border-emerald-800/50 hover:bg-emerald-800/40 hover:border-amber-400/30 transition-all duration-500"
                       >
                         <div className="mb-4 inline-flex p-3 rounded-2xl bg-emerald-950/50 text-amber-400 group-hover:text-amber-300 group-hover:shadow-[0_0_20px_rgba(251,191,36,0.2)] transition-all">
                           <Icon size={28} strokeWidth={1.5} />
                         </div>
-                        <p className="text-stone-200 text-lg md:text-xl leading-relaxed font-medium group-hover:text-white transition-colors">
+                        <p className="text-stone-200 text-xl md:text-2xl leading-relaxed font-medium group-hover:text-white transition-colors">
                           {bullet}
                         </p>
                       </motion.div>
@@ -149,34 +169,6 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Minimal Floating Footer Controls */}
-      <footer className="relative z-20 px-8 py-8 md:px-20 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center bg-emerald-900/40 backdrop-blur-lg rounded-2xl border border-emerald-800/50 p-1.5">
-            <button
-              onClick={prevSlide}
-              className="p-3 rounded-xl hover:bg-emerald-800/60 transition-all text-emerald-400 active:scale-90"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <button
-              onClick={nextSlide}
-              className="p-3 rounded-xl hover:bg-emerald-800/60 transition-all text-emerald-400 active:scale-90"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleFullscreen}
-            className="p-4 rounded-2xl bg-emerald-900/40 backdrop-blur-lg border border-emerald-800/50 hover:bg-emerald-800/60 transition-all text-emerald-400 active:scale-90"
-          >
-            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-          </button>
-        </div>
-      </footer>
     </div>
   );
 }
